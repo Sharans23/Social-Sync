@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -10,7 +11,6 @@ import {
   ArrowLeft,
   SendBtn,
 } from "../../../../public/svgs";
-import { useRouter } from "next/navigation";
 import LoadingScreen from "@/app/loading";
 import Message from "./(components)/Message";
 import Reply from "./(components)/Reply";
@@ -29,6 +29,7 @@ export default function Page({ params }) {
   const [message, setMessage] = useState("");
   const [creatorInfo, setCreatorInfo] = useState();
   const [loading, setLoading] = useState(true);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [liked, setLiked] = useState(false); // temporary
   const { user } = useStore()
   const router = useRouter();
@@ -146,6 +147,67 @@ export default function Page({ params }) {
     getPreviousMessages(params.streamId);
   }, [params]);
 
+
+  const handleSubscribe = async () => {
+    
+    try {
+        console.log("handleSubscribe called");
+        console.log("creatorUserId:", creatorInfo.userId);
+        console.log("streamId:", params.streamId);
+      const response = await fetch(`${url}/api/subscription`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          creatorUserId: creatorInfo.userId,
+          streamId: params.streamId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Handle successful subscription
+        console.log("Subscription successful:", data);
+        setIsSubscribed(true); // Update the subscription status
+      } else {
+        // Handle subscription error
+        console.error("Subscription error:", data.error);
+      }
+    } catch (error) {
+      console.error("Error occurred during subscription:", error);
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    try {
+      const response = await fetch(`${url}/api/subscription`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          creatorUserId: creatorInfo.userId,
+          streamId: params.streamId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Handle successful unsubscription
+        console.log("Unsubscription successful:", data);
+        setIsSubscribed(false); // Update the subscription status
+      } else {
+        // Handle unsubscription error
+        console.error("Unsubscription error:", data.error);
+      }
+    } catch (error) {
+      console.error("Error occurred during unsubscription:", error);
+    }
+  };
+
   return (
     <>
       {render && streamInfo && creatorInfo ? (
@@ -168,7 +230,17 @@ export default function Page({ params }) {
             <div className="flex justify-between h-full">
               <div className="w-[64.5%]">
                 <div style={streamBox} className="h-5/6">
-                  <Call channelName={params.streamId} AppID={"8a19575fdd7e4b2a93fcf5a01b9539aa"} type={(user && streamInfo && (streamInfo.userUserId === user.userId)?"host":"audience")} />
+                  <Call
+                    channelName={params.streamId}
+                    AppID={"8a19575fdd7e4b2a93fcf5a01b9539aa"}
+                    type={
+                      user &&
+                      streamInfo &&
+                      streamInfo.userUserId === user.userId
+                        ? "host"
+                        : "audience"
+                    }
+                  />
                 </div>
                 <div className="h-2/6 p-2 mt-2">
                   <div>
@@ -204,8 +276,13 @@ export default function Page({ params }) {
                       <div className="rounded-full w-9 h-9 bg-gradient-to-r from-[#F16602] to-[#FF8E00] flex justify-center items-center ml-4 hover:cursor-pointer">
                         <ThreeDots />
                       </div>
-                      <div className="rounded-full w-36 h-9 bg-gradient-to-r from-[#F16602] to-[#FF8E00] text-[#020317] text-xl font-semibold flex justify-center items-center ml-4 hover:cursor-pointer">
-                        Subscribe
+                      <div
+                        className="rounded-full w-36 h-9 bg-gradient-to-r from-[#F16602] to-[#FF8E00] text-[#020317] text-xl font-semibold flex justify-center items-center ml-4 hover:cursor-pointer"
+                        onClick={
+                          isSubscribed ? handleUnsubscribe : handleSubscribe
+                        }
+                      >
+                        {isSubscribed ? "Unsubscribe" : "Subscribe"}
                       </div>
                     </div>
                   </div>
@@ -224,11 +301,12 @@ export default function Page({ params }) {
                   <div className="text-2xl font-bold leading-7 text-[#FF8E00] text-center m-2">
                     Live chat
                   </div>
-                  <div ref={divRef} className="mt-4 overflow-y-auto pr-2 h-[74%]">
+                  <div
+                    ref={divRef}
+                    className="mt-4 overflow-y-auto pr-2 h-[74%]"
+                  >
                     {messages.map((item, ind) => {
-                      return (
-                        <Message key={ind} message={item} />
-                      )
+                      return <Message key={ind} message={item} />;
                     })}
                     {/* <Message />
                     <Message />
@@ -236,7 +314,6 @@ export default function Page({ params }) {
                     <Message />
                     <Message />
                     <Reply /> */}
-
                   </div>
                   <div className="absolute bottom-5 w-[95%]">
                     <div className="flex justify-end mt-2 mb-2">
@@ -255,14 +332,19 @@ export default function Page({ params }) {
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onSubmit={handleSend}
-                            onKeyDown={(e) => {if(e.key==="Enter"){
-                              handleSend(e)
-                            }}}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleSend(e);
+                              }
+                            }}
                             placeholder="Send message on chat"
                             className="font-medium text-xl bg-[#F4F3F3] w-full text-black focus:outline-none"
                           />
                         </div>
-                        <div onClick={handleSend} className="bg-[#020317] h-7 w-7 rounded-full flex ml-2 justify-center items-center hover:cursor-pointer">
+                        <div
+                          onClick={handleSend}
+                          className="bg-[#020317] h-7 w-7 rounded-full flex ml-2 justify-center items-center hover:cursor-pointer"
+                        >
                           <SendBtn />
                         </div>
                       </div>
